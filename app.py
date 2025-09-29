@@ -1,24 +1,33 @@
 
+#!pip install streamlit streamlit-mic-recorder openai-whisper transformers torch sentencepiece nltk
+#!pip install pyngrok
+
+"""Actual code uploaded to github"""
+
+#!pip install streamlit streamlit-mic-recorder openai-whisper transformers torch sentencepiece nltk
+#!pip install pyngrok
+
 import os
 import streamlit as st
 from streamlit_mic_recorder import mic_recorder
 from transformers import pipeline, AutoTokenizer
 import tempfile
 import nltk
+from datetime import datetime
 
 # ---- Force NLTK download ----
 nltk.download('punkt', quiet=True)
 nltk.download('punkt_tab', quiet=True)
 
 # ---- 1. State Management ----
-# Initialize session state for audio data
 if 'audio_data' not in st.session_state:
     st.session_state.audio_data = None
+if 'file_name' not in st.session_state:
+    st.session_state.file_name = None
 
-# Callback function to cleanly reset the app state
 def reset_app():
     st.session_state.audio_data = None
-    # Explicitly clear the internal states of the widgets
+    st.session_state.file_name = None
     if 'recorder' in st.session_state:
         del st.session_state['recorder']
     if 'uploader' in st.session_state:
@@ -71,7 +80,6 @@ def generate_flashcards(text):
 # ---- 3. Main App UI and Logic ----
 st.title("Lecture Voice-to-Notes Generator (Free Tools)")
 
-# If there is no audio data, show the input UI.
 if st.session_state.audio_data is None:
     st.write("Record live audio or upload a lecture file to begin.")
     tab1, tab2 = st.tabs(["🎤 Microphone", "📁 Upload Audio"])
@@ -79,19 +87,32 @@ if st.session_state.audio_data is None:
     with tab1:
         audio = mic_recorder(start_prompt="🎙️ Start Recording", stop_prompt="⏹️ Stop", format="webm", key='recorder')
         if audio and audio['bytes']:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            st.session_state.file_name = f"recording_{timestamp}.webm"
             st.session_state.audio_data = audio['bytes']
             st.rerun()
 
     with tab2:
-        # Add a key to the uploader to allow us to reset it
-        audio_file = st.file_uploader("Upload lecture audio...", type=["wav", "mp3", "webm"], key='uploader')
+        audio_file = st.file_uploader("Upload lecture audio...", type=["wav", "mp3", "webm","m4a"], key='uploader')
         if audio_file:
+            st.session_state.file_name = audio_file.name
             st.session_state.audio_data = audio_file.read()
             st.rerun()
-
-# If there IS audio data, run the processing and show the results.
 else:
+    st.subheader(f"Analysis for: `{st.session_state.file_name}`")
     st.audio(st.session_state.audio_data)
+
+    # --- THE FIX: Provide a copyable filename for the user ---
+    st.write("Your browser might assign a random name to the download. Please use the suggested filename below.")
+    st.code(st.session_state.file_name, language=None)
+    
+    st.download_button(
+        label="Download Audio File",
+        data=st.session_state.audio_data,
+        file_name=st.session_state.file_name, # Still suggest the name
+        mime="audio/webm"
+    )
+    # --- END OF FIX ---
 
     with st.spinner("Transcribing audio... (This may take several minutes)"):
         transcription = transcribe_with_whisper(st.session_state.audio_data)
@@ -118,5 +139,4 @@ else:
     else:
         st.error("Could not process the audio.")
 
-    # THE FIX: Use the on_click callback to reset the state instantly.
     st.button("Start Over", on_click=reset_app)
