@@ -39,7 +39,11 @@ def load_models():
     """Loads all AI models and tokenizers once."""
     summarizer = pipeline("summarization", model="t5-small")
     summarizer_tokenizer = AutoTokenizer.from_pretrained("t5-small")
-    qg_pipe = pipeline("text2text-generation", model="BeIR/query-gen-msmarco-t5-base-v1")
+
+    # This model consumes more memory than the below model.
+    # qg_pipe = pipeline("text2text-generation", model="BeIR/query-gen-msmarco-t5-base-v1")
+    qg_pipe = pipeline("text2text-generation", model="valhalla/t5-small-qg-hl")
+    
     return summarizer, summarizer_tokenizer, qg_pipe
 
 summarizer, summarizer_tokenizer, qg_pipe = load_models()
@@ -105,7 +109,7 @@ else:
     # --- THE FIX: Provide a copyable filename for the user ---
     st.write("Your browser might assign a random name to the download. Please use the suggested filename below.")
     st.code(st.session_state.file_name, language=None)
-    
+
     st.download_button(
         label="Download Audio File",
         data=st.session_state.audio_data,
